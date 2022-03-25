@@ -55,6 +55,7 @@ def main():
                 break
 
         #decrease epsilon 
+        
         epsilon = np.exp(-decay_rate*episode)
         print(f"\r episode number: {episode}")
 
@@ -84,4 +85,3 @@ def main():
 
 if __name__ == "__main__": 
     main()
-
