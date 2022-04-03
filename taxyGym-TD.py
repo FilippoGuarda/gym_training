@@ -1,10 +1,7 @@
 # taxi gym using a temporal difference algorithm
 
-from hashlib import new
-from selectors import EpollSelector
 import numpy as np
 import gym 
-import random
  
 
 def main():
