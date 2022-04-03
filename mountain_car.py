@@ -29,7 +29,7 @@ def main():
     approximator = np.zeros((state_num[0], state_num[1], env.action_space.n, 10))
 
     #initialize qtable
-    qtable = np.zeros((state_num[0], state_num[1], env.action_space.n, 10))*approximator
+    qtable = np.zeros((state_num[0], state_num[1], env.action_space.n, 10))
 
     #initialize elegibility
     elegibility = np.zeros_like(qtable)
@@ -44,7 +44,7 @@ def main():
             action = env.action_space.sample()
             e = 0
         else:
-            action = np.argmax(qtable[state_num[0],state_num[1]])
+            action = np.argmax(np.transpose(qtable[state_num[0],state_num[1]])*approximator)
             e = e + 1
         return action
 
@@ -62,37 +62,38 @@ def main():
             epsilon = epsilon*np.exp(-epsilon_decay*episode_num)
 
     #adds 1 to all shifted tiles where the state is present
-    def tiling_elegibility(state):
+    def tiling_elegibility(state, decrease):
 
         for i in range(elegibility[:,:,:,1]):
 
             state_adj = (state - env.observation_space.low)*np.array([10, 100])+[0.1*i, 0.1*i]
             state_adj = np.round(state_adj, 0).astype(int)
 
-            elegibility[state_adj[0], state_adj[1], :, i] += 1
+            if not decrease:
+                elegibility[state_adj[0], state_adj[1], :, i] += 1
+            else:
+                elegibility[state_adj[0], state_adj[1], :, i] += gamma*lambda_weight*elegibility[state_adj[0], state_adj[1], :, i]
 
 
     #update function
     def update(state, new_state, action, new_action, elegibility, reward):
 
-        q = qtable[state[0], state[1],action, :]
-        nextq = qtable[new_state[0], new_state[1], new_action]
+        q = qtable[state[0], state[1],action]
+        nextq = qtable[new_state[0], new_state[1], :]
         e = elegibility[state[0], state[1]]
+
+
         #prediction of future state-action value
-        predict = q
-        #target state-action value
-        target = reward + gamma*nextq
-        # qtable[state, action] = qtable[state,action] + alpha*(target - predict)
+        sigma = reward - np.transpose(qtable)*approximator
+
 
         #difference between target and predicted state-action value
-        sigma = target - predict
-        elegibility[state[0], state[1], action] = e + 1
+        sigma = sigma - gamma*np.max(np.transpose(nextq)*approximator)
 
-        for n in range(state_num):
-            for m in range(env.action_space.n):
-                #Qlearning algorithm: qtable  element = qtable element + discounted sigma and elegibility
-                qtable[n,m] = qtable[n,m] + alpha*sigma*elegibility[n,m]
-                elegibility[n,m] = gamma*lambda_weight*elegibility[n,m]
+        approximator = approximator + alpha*sigma*e
+
+        tiling_elegibility(state, decrease=True)
+
 
     #Q-learning function
     for episode in range(episode_num):
@@ -109,6 +110,8 @@ def main():
             if episode >= (episode_num - 20):
                 env.render()
 
+            #add elegibility
+            tiling_elegibility(state, decrease=False)
             #select action
             action = choose_action(state_adj, elegibility)
             new_state, reward, done, info = env.step(action)
